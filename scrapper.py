@@ -3,6 +3,7 @@
 import os
 import sys
 import datetime
+import time
 import flask
 import requests
 
@@ -38,6 +39,9 @@ def index():
 def test_api_request():
     if 'credentials' not in flask.session:
         return flask.redirect('authorize')
+    
+    if '_last_timestamp' not in flask.session:
+        flask.session['_last_timestamp'] = INITIAL_TIMESTAMP
 
     words = fetch_keywords()
     credentials = google.oauth2.credentials.Credentials(
@@ -49,13 +53,16 @@ def test_api_request():
     output_db = MongoDb(MONGO_COLLECTION)
     
     insert_ids = []
-    for msg in fetch_email(service, words):
+    for msg in fetch_email(service, words, flask.session['_last_timestamp']):
         if msg:
-            msg["created_at"] = datetime.datetime.utcnow()
-            insert_ids.append(str(output_db.insert_one(msg)))
-
+            if msg['type']:
+                msg["created_on"] = datetime.datetime.utcnow()
+                insert_ids.append(str(output_db.insert_one(msg)))
+            else:
+                print(msg['From'])
+            
     flask.session['credentials'] = credentials_to_dict(credentials)
-
+    flask.session['_last_timestamp'] = int(time.time())
     return flask.jsonify({"message": "successfully inserted emails to mongo db",
                           "doc_ids": insert_ids})
 
@@ -114,10 +121,25 @@ def revoke():
 
 @app.route('/clear')
 def clear_credentials():
+    if '_last_timestamp' in flask.session:
+        del flask.session['_last_timestamp']
     if 'credentials' in flask.session:
         del flask.session['credentials']
     return ('Credentials have been cleared.<br><br>' +
             print_index_table())
+
+@app.route('/doc/<id>')
+def get_mongo_doc(id):
+    output_db = MongoDb(MONGO_COLLECTION)
+    res = output_db.find_one({"_id": id})
+    res['_id'] = str(res['_id'])
+    return flask.jsonify(res), 200
+
+
+@app.route('/docs/<count>')
+def get_docs(count):
+    output_db = MongoDb(MONGO_COLLECTION)
+    return flask.jsonify(output_db.get_last_n(count)), 200
 
 
 if __name__ == '__main__':

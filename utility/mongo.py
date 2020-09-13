@@ -32,3 +32,12 @@ class MongoDb:
         for key in options.keys():
             _options[key] = ObjectId(options[key])
         return self.db.emails.find_one(_options)
+
+    def get_last_n(self, count):
+        res = []
+        mails = self.db.emails.find().skip(self.db.emails.count() - int(count))
+        for mail in mails:
+            mail['_id'] = str(mail['_id'])
+            mail["attachment_data"] = "contains data not showing in this view"
+            res.append(mail)
+        return res

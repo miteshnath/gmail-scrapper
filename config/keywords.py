@@ -9,6 +9,7 @@ KEYWORDS = [
     "receipt",
     "subscription", 
     "swiggy order",
+    "transaction alert"
     "transaction alerts",
     "upcoming subscription",
     "zomato order",

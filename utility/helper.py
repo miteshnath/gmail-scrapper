@@ -1,4 +1,5 @@
 import base64
+import time
 import pickle
 import re
 import sys
@@ -48,9 +49,10 @@ def print_index_table():
             '</td></tr></table>')
 
 
-def fetch_email(service, words):
+def fetch_email(service, words, _timestamp):
     # Call the Gmail API
-    results = service.users().messages().list(userId='me', labelIds=["INBOX"]).execute()
+    query = f"after:{_timestamp}"
+    results = service.users().messages().list(userId='me', labelIds=["INBOX"], q=query).execute()
     messages = results.get('messages', [])
     
     if len(messages)<1:
@@ -60,9 +62,12 @@ def fetch_email(service, words):
             msg = service.users().messages().get(userId="me", id=message["id"], format="full").execute()
             res = {}
             res["body"] = msg['snippet']
+            res['created_at'] = int(time.time())
             matches = datefinder.find_dates(res["body"])
+            
             for match in matches:
                 res["bill_date"] = match
+                
             for header in msg['payload']['headers']:
                 if 'name' in header.keys() and header['name'] in ["Subject", "From", "To"]:
                     if header.get("name") == "Subject":
@@ -76,19 +81,23 @@ def fetch_email(service, words):
                             yield []
                         res["type"] = _type
                     res[header["name"]] = header["value"]
-                    
-            for part in msg['payload']['parts']:
-                if part['filename']:
-                    if 'data' in part['body']:
-                        data = part['body']['data']
-                    else:
-                        att_id = part['body']['attachmentId']
-                    att = service.users().messages().attachments().get(
-                        userId="me", messageId=message['id'], id=att_id
-                        ).execute()
-                    file_data = base64.urlsafe_b64decode(att['data'].encode('UTF-8'))
-                    res["attachment_file"] = part['filename']
-                    res["attachment_data"] = str(file_data)
+            
+            try:
+                for part in msg['payload']['parts']:
+                    if part['filename']:
+                        if 'data' in part['body']:
+                            data = part['body']['data']
+                        else:
+                            att_id = part['body']['attachmentId']
+                        att = service.users().messages().attachments().get(
+                            userId="me", messageId=message['id'], id=att_id
+                            ).execute()
+                        file_data = base64.urlsafe_b64decode(att['data'].encode('UTF-8'))
+                        res["attachment_file"] = part['filename']
+                        res["attachment_data"] = str(file_data)
+            except KeyError:
+                pass                                                 
+            
             yield res
             
 
