@@ -8,7 +8,8 @@ at start (using query "after:timestamp"), it can be made to pick mails from even
 
 On successful run it will store the most recent timestamp in redis flask session so, next run it picks only latest mails
 
-after reading mail I basically look for keywords(list stored in redis like "alerts", "bills", etc) in subject, if present I scan the body and fetch attachments or date and push them to a mongo database
+after reading mail I basically look for keywords(list stored in redis updateable by directly inserting into redis even if the app is running 
+like "alerts", "bills", etc) in subject, if present I scan the body and fetch attachments or date and push them to a mongo database
 
 Currently this is not async in nature, so takes times, ideally pub/sub or queue should be added to improve this part.
 
